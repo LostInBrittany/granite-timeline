@@ -40,7 +40,9 @@ Install the component using [Bower](http://bower.io/):
 $ bower install LostInBrittany/granite-timeline --save
 ```
 
-Or [download as ZIP](https://github.com/LostInBrittany/granite-timeline/archive/gh-pages.zip).## Usage
+Or [download as ZIP](https://github.com/LostInBrittany/granite-timeline/archive/gh-pages.zip).
+
+## Usage
 
 1. Import Web Components' polyfill (if needed):
 

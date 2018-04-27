@@ -20,7 +20,7 @@
     "polymer": "Polymer/polymer#^2.0.0",
     "granite-js-dependencies-grabber": "LostInBrittany/granite-js-dependencies-grabber#^1.2.0",
     "d3": "^5.1.0",
-    "d3-timelines": "LostInBrittany/d3-timeline#master"
+    "d3-timeline": "LostInBrittany/d3-timeline#master"
   },
   "devDependencies": {
     "iron-demo-helpers": "PolymerElements/iron-demo-helpers#^2.0.0",
