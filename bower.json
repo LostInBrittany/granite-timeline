@@ -2,6 +2,7 @@
   "name": "granite-timeline",
   "description": "A timeline rendering element using d3 and d3-timelines plugin",
   "main": "granite-timeline.html",
+  "license":"MIT",
   "dependencies": {
     "polymer": "Polymer/polymer#^2.0.0",
     "granite-js-dependencies-grabber": "LostInBrittany/granite-js-dependencies-grabber#^1.2.0",
