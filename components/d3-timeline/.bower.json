@@ -1,0 +1,12 @@
+{
+  "name": "d3-timeline",
+  "homepage": "https://github.com/LostInBrittany/d3-timeline",
+  "_release": "8786143466",
+  "_resolution": {
+    "type": "commit",
+    "commit": "8786143466f4fd8a2ebe662a4c51967ff5a18141"
+  },
+  "_source": "https://github.com/LostInBrittany/d3-timeline.git",
+  "_target": "8786143466f4fd8a2ebe662a4c51967ff5a18141",
+  "_originalSource": "LostInBrittany/d3-timeline"
+}

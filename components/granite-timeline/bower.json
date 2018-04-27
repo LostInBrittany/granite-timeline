@@ -1,0 +1,33 @@
+{
+  "name": "granite-timeline",
+  "authors": [
+    "Horacio Gonzalez <horacio.gonzalez@gmail.com>"
+  ],
+  "description": "A timeline rendering element using d3 and d3-timelines plugin",
+  "main": "granite-timeline.html",
+  "license": "MIT",
+  "homepage": "https://github.com/LostInBrittany/granite-timeline",
+  "keywords": [
+    "web-component",
+    "web-components",
+    "polymer",
+    "lostinbrittany",
+    "d3",
+    "d3-timelines",
+    "timeline"
+  ],
+  "dependencies": {
+    "polymer": "Polymer/polymer#^2.0.0",
+    "granite-js-dependencies-grabber": "LostInBrittany/granite-js-dependencies-grabber#^1.2.0",
+    "d3": "^5.1.0",
+    "d3-timeline": "LostInBrittany/d3-timeline#8786143466f4fd8a2ebe662a4c51967ff5a18141"
+  },
+  "devDependencies": {
+    "iron-demo-helpers": "PolymerElements/iron-demo-helpers#^2.0.0",
+    "web-component-tester": "Polymer/web-component-tester#^6.0.0",
+    "webcomponentsjs": "webcomponents/webcomponentsjs#^1.0.0"
+  },
+  "resolutions": {
+    "polymer": "^2.0.0"
+  }
+}
