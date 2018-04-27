@@ -494,7 +494,7 @@
         if (evt.detail.name !== 'd3.timelines') {
           return;
         }
-        this._width = this.$.timeline.clientWidth;
+        this._width = this.$.timeline.clientWidth || 300;
         this._libReady = true;
       }
 
@@ -695,7 +695,7 @@
         }
 
         d3.select(this.$.timeline)
-          .append('svg').attr('width', this.$.timeline.clientWidth)
+          .append('svg').attr('width', this._width)
           .datum(this.data).call(this.chart);
       }
     }
