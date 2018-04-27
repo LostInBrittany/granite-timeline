@@ -678,8 +678,14 @@
     
       draw() {
         if (!this._libReady) {
-          setTimeout(() => this.draw(), 5);
+          if (!this._interval) {
+            this._interval = setInterval(() => this.draw(), 5);
+          }
           return;
+        }
+        if (this._interval) {
+          clearInterval(this._interval);
+          this._interval = null;
         }
         if (this.debug) {
           console.log('[granite-timeline] draw - Drawing', this.data);
@@ -688,11 +694,6 @@
         this.chart = d3.timelines();
         // this._setProperties();
         // this._setListeners();
-
-
-        if (this.debug) {
-          console.log('[granite-timeline] draw - Colors', this.chart.colors());
-        }
 
         d3.select(this.$.timeline)
           .append('svg').attr('width', this._width)
