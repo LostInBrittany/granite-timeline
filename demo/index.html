@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes">
+
+    <title>granite-timeline demo</title>
+
+    <script src="../../webcomponentsjs/webcomponents-loader.js"></script>
+
+    <link rel="import" href="../../iron-demo-helpers/demo-pages-shared-styles.html">
+    <link rel="import" href="../../iron-demo-helpers/demo-snippet.html">
+    <link rel="import" href="../granite-timeline.html">
+
+    <custom-style>
+      <style is="custom-style" include="demo-pages-shared-styles">
+      </style>
+    </custom-style>
+  </head>
+  <body>
+    <div class="vertical-section-container centered">
+      <h3>Basic granite-timeline demo</h3>
+      <demo-snippet>
+        <template>
+          <granite-timeline 
+            data='[{"times":[{"starting_time":1355752800000,"ending_time":1355759900000}, {"starting_time":1355767900000,"ending_time":1355774400000}]},{"times":[{"starting_time":1355759910000,"ending_time":1355761900000}]},{"times":[{"starting_time":1355761910000,"ending_time":1355763910000}]}]'          
+          debug></granite-timeline>
+        </template>
+      </demo-snippet>
+    </div>
+  </body>
+</html>

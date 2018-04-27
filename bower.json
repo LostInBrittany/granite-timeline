@@ -1,0 +1,19 @@
+{
+  "name": "granite-timeline",
+  "description": "A timeline rendering element using d3 and d3-timelines plugin",
+  "main": "granite-timeline.html",
+  "dependencies": {
+    "polymer": "Polymer/polymer#^2.0.0",
+    "granite-js-dependencies-grabber": "LostInBrittany/granite-js-dependencies-grabber#^1.2.0",
+    "d3": "^5.1.0",
+    "d3-timelines": "LostInBrittany/d3-timeline#master"
+  },
+  "devDependencies": {
+    "iron-demo-helpers": "PolymerElements/iron-demo-helpers#^2.0.0",
+    "web-component-tester": "Polymer/web-component-tester#^6.0.0",
+    "webcomponentsjs": "webcomponents/webcomponentsjs#^1.0.0"
+  },
+  "resolutions": {
+    "polymer": "^2.0.0"
+  }
+}
