@@ -501,7 +501,7 @@
       // -----------------------------------------------------------------------
       // Other methods
       // -----------------------------------------------------------------------
-      _setProperties() {
+      _setProperties() { 
         if (this.width) {
           this.chart.width(this.width);
         }
@@ -515,7 +515,7 @@
           this.chart.itemMargin(this.itemMargin);
         }
     
-        let margin = {};
+        let margin = this.chart.margin();
         if (this.marginTop !== undefined) {
           margin.top = this.marginTop;
         }
@@ -538,7 +538,7 @@
           this.chart.labelFormat(this.labelFormat);
         }
 
-        let tickFormat = {};
+        let tickFormat = this.chart.tickFormat();
         if (this.tickFormat) {
           tickFormat.format = this.tickFormat;
         }
@@ -559,7 +559,7 @@
         }
         this.chart.tickFormat(tickFormat);
 
-
+        
         if (this.rotateTicks) {
           this.chart.rotateTicks(this.rotateTicks);
         }
@@ -569,18 +569,18 @@
         }
 
         if (this.colors) {
-          this.chart.rotateTicks(this.colors);
+          this.chart.colors(this.colors);
         }
 
         if (this.colorsProperty) {
-          this.chart.rotateTicks(this.colorsProperty);
+          this.chart.colorsProperty(this.colorsProperty);
         }
 
         if (this.beginning) {
-          this.chart.rotateTicks(this.beginning);
+          this.chart.beginning(this.beginning);
         }
         if (this.ending) {
-          this.chart.rotateTicks(this.ending);
+          this.chart.ending(this.ending);
         }
 
         if (this.stack) {
@@ -594,7 +594,8 @@
         if (this.showToday) {
           this.chart.showToday();
         }
-        let showTodayFormat = {};
+
+        let showTodayFormat = this.chart.showTodayFormat();
         if (this.todayMarginTop) {
           showTodayFormat.marginTop = this.todayMarginTop;
         }
@@ -612,7 +613,8 @@
         if (this.showBorderLine) {
           this.chart.showBorderLine();
         }
-        let borderFormat = {};
+
+        let borderFormat = this.chart.showBorderFormat();
         if (this.borderLineMarginTop) {
           borderFormat.marginTop = this.borderLineMarginTop;
         }
@@ -633,7 +635,7 @@
         if (this.showTimeAxisTick) {
           this.chart.showTimeAxisTick();
         }
-        let showTimeAxisTickFormat = {};
+        let showTimeAxisTickFormat = this.chart.showTimeAxisTickFormat();
         if (this.timeAxisTickStroke) {
           showTimeAxisTickFormat.stroke = this.timeAxisTickStroke;
         }
@@ -692,8 +694,8 @@
         }
 
         this.chart = d3.timelines();
-        // this._setProperties();
-        // this._setListeners();
+        this._setProperties();
+        this._setListeners();
 
         d3.select(this.$.timeline)
           .append('svg').attr('width', this._width)
