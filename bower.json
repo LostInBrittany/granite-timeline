@@ -18,7 +18,7 @@
   ],
   "dependencies": {
     "polymer": "Polymer/polymer#^2.0.0",
-    "granite-js-dependencies-grabber": "LostInBrittany/granite-js-dependencies-grabber#^1.2.0",
+    "granite-js-dependencies-grabber": "LostInBrittany/granite-js-dependencies-grabber#^1.2.1",
     "d3": "^5.1.0",
     "d3-timeline": "LostInBrittany/d3-timeline#8786143466f4fd8a2ebe662a4c51967ff5a18141"
   },
