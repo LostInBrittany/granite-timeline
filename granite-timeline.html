@@ -501,7 +501,7 @@
       // -----------------------------------------------------------------------
       // Other methods
       // -----------------------------------------------------------------------
-      _setProperties() { 
+      _setProperties() {
         if (this.width) {
           this.chart.width(this.width);
         }
@@ -559,7 +559,7 @@
         }
         this.chart.tickFormat(tickFormat);
 
-        
+    
         if (this.rotateTicks) {
           this.chart.rotateTicks(this.rotateTicks);
         }
@@ -661,20 +661,30 @@
 
       _setListeners() {
         this.chart
-          .mouseover((d, i, datum) => {
-            this.dispatchEvent(new CustomEvent('mouseover', {detail: {d, i, datum}}));
+          .mouseover((d, index, datum, i) => {
+            let evt = d3.event;
+            let mouse = d3.mouse(this);
+            this.dispatchEvent(new CustomEvent('mouseover', {detail: {d, index, datum, i, evt, mouse}}));
           })
-          .mouseout((d, i, datum) => {
-            this.dispatchEvent(new CustomEvent('mouseout', {detail: {d, i, datum}}));
+          .mouseout((d, index, datum, i) => {
+            let evt = d3.event;
+            let mouse = d3.mouse(this);
+            this.dispatchEvent(new CustomEvent('mouseout', {detail: {d, index, datum, i, evt, mouse}}));
           })
-          .hover((d, i, datum) => {
-            this.dispatchEvent(new CustomEvent('hover', {detail: {d, i, datum}}));
+          .hover((d, index, datum, i) => {
+            let evt = d3.event;
+            let mouse = d3.mouse(this);
+            this.dispatchEvent(new CustomEvent('hover', {detail: {d, index, datum, i, evt, mouse}}));
           })
-          .click((d, i, datum) => {
-            this.dispatchEvent(new CustomEvent('click', {detail: {d, i, datum}}));
+          .click((d, index, datum, i) => {
+            let evt = d3.event;
+            let mouse = d3.mouse(this);
+            this.dispatchEvent(new CustomEvent('click', {detail: {d, index, datum, i, evt, mouse}}));
           })
-          .scroll((d, i, datum) => {
-            this.dispatchEvent(new CustomEvent('scroll', {detail: {d, i, datum}}));
+          .scroll((d, index, datum, i) => {
+            let evt = d3.event;
+            let mouse = d3.mouse(this);
+            this.dispatchEvent(new CustomEvent('scroll', {detail: {d, index, datum, i, evt, mouse}}));
           });
       }
     
