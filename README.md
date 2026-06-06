@@ -4,6 +4,8 @@
 
 A timeline rendering web component built with [Lit](https://lit.dev) and [d3](https://d3js.org) v7.
 
+**Live demo**: [https://lostinbrittany.github.io/granite-timeline/demo/](https://lostinbrittany.github.io/granite-timeline/demo/)
+
 > **v3.0.0** is a full rewrite: Lit instead of Polymer, native d3 v7 rendering instead of the
 > abandoned `d3-timelines` plugin, plain ES modules, no polyfills, no runtime script loading.
 > See [Migration from v2](#migration-from-v2).
@@ -141,6 +143,10 @@ The chart renders in shadow DOM. Customization hooks:
 | `::part(timeline)` | The chart container |
 
 ## Demo
+
+Live version: [https://lostinbrittany.github.io/granite-timeline/demo/](https://lostinbrittany.github.io/granite-timeline/demo/)
+
+To run it locally:
 
 ```sh
 npm install
