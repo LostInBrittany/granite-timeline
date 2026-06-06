@@ -83,6 +83,7 @@ el.tickTime = timeHour;
 | `tickValues` | — | Array | — | Explicit tick values (Date or ms epoch) |
 | `rotateTicks` | `rotate-ticks` | Number | `0` | Rotation of the tick labels in degrees |
 | `axisTop` | `axis-top` | Boolean | `false` | Places the time axis on top |
+| `axisZoom` | `axis-zoom` | Boolean | `false` | Enables zooming (Ctrl/⌘ + wheel, pinch, double-click) and panning (drag) of the time axis |
 | `colors` | — | d3 ordinal scale | `scaleOrdinal(schemeCategory10)` | Color scale for the series |
 | `colorsProperty` | `colors-property` | String | — | Data property mapped to the `colors` scale |
 | `beginning` | `beginning` | Date\|Number\|String | computed | Start of the timeline |
@@ -119,6 +120,16 @@ SVG, and `evt` the originating DOM event.
 Note: a `click` listener also receives native click events from the element; check
 `event.detail?.d` to distinguish bar clicks.
 
+When `axisZoom` is enabled, a `zoom` event is fired on every zoom/pan, with
+`detail: { start, end, transform }` where `start`/`end` are the `Date` bounds of the
+visible domain and `transform` the d3 zoom transform.
+
+## Methods
+
+| Method | Description |
+|---|---|
+| `resetZoom()` | Resets the axis zoom/pan to the initial full-domain view |
+
 ## Styling
 
 The chart renders in shadow DOM. Customization hooks:
@@ -141,8 +152,11 @@ npm run dev    # open http://localhost:5173/demo/
 - **No more script loading**: d3 is now a regular ES-module dependency. Remove any
   `granite-js-dependencies-grabber` setup; `bower` and the webcomponentsjs polyfills are gone.
 - **Dropped properties**: `displayCircles`, `relativeTime`, `showBorderLine` (+ its
-  `borderLine*` format properties), `axisZoom`, `showTimeAxisTick` (+ `timeAxisTick*`),
+  `borderLine*` format properties), `showTimeAxisTick` (+ `timeAxisTick*`),
   `xAxisClass`. Open an issue if you need one of them back.
+- **`axisZoom`** is kept, but zooming with the mouse wheel now requires
+  <kbd>Ctrl</kbd>/<kbd>⌘</kbd> so the chart doesn't hijack page scrolling; drag pans,
+  and a `zoom` event reports the visible domain.
 - **Dropped events**: `scroll`. The `i` field of event details is gone — use `index`.
 - **Tick intervals**: `tickTime` now takes a modern d3-time interval
   (`import { timeHour } from 'd3-time'`) instead of the old `d3.time.hours`.

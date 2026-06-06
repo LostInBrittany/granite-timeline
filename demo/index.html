@@ -89,6 +89,23 @@
     </section>
 
     <section>
+      <h3>Axis zoom &amp; pan</h3>
+      <granite-timeline id="zoom"
+          stack show-time-axis axis-zoom
+          margin-left="100"
+          tick-format="%d %b %H:%M"></granite-timeline>
+      <p>
+        <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + mouse wheel (or trackpad pinch) to zoom,
+        drag to pan, double-click to zoom in.
+        <button id="reset-zoom">Reset zoom</button>
+      </p>
+      <output id="zoom-log">(zoom events will appear here)</output>
+      <pre>&lt;granite-timeline stack show-time-axis axis-zoom&gt;&lt;/granite-timeline&gt;
+el.addEventListener('zoom', (e) =&gt; { /* e.detail = {start, end, transform} */ });
+el.resetZoom();   // back to the full-domain view</pre>
+    </section>
+
+    <section>
       <h3>Events</h3>
       <granite-timeline id="events"
           stack show-time-axis

@@ -30,6 +30,7 @@ import { scaleTime, scaleOrdinal } from 'd3-scale';
 import { axisBottom, axisTop } from 'd3-axis';
 import { timeFormat } from 'd3-time-format';
 import { schemeCategory10 } from 'd3-scale-chromatic';
+import { zoom as d3zoom } from 'd3-zoom';
 
 /**
  * Default rendering options.
@@ -39,6 +40,7 @@ export const TIMELINE_DEFAULTS = {
   itemMargin: 5,
   margin: { top: 30, right: 30, bottom: 30, left: 30 },
   tickSize: 6,
+  maxZoomScale: 1024,
   todayFormat: {
     marginTop: 25,
     marginBottom: 0,
@@ -46,6 +48,9 @@ export const TIMELINE_DEFAULTS = {
     color: 'rgb(245, 157, 0)',
   },
 };
+
+/** Counter used to generate unique clip-path ids inside a document. */
+let clipIdCounter = 0;
 
 /**
  * Computes the time domain of the chart.
@@ -172,6 +177,12 @@ function buildAxis(xScale, options) {
 /**
  * Renders the timeline into `containerEl`, replacing any previous svg.
  *
+ * When `options.axisZoom` is set, the time axis can be zoomed with
+ * Ctrl/⌘ + mouse wheel (or trackpad pinch), panned by dragging, and zoomed in
+ * by double-clicking. `options.onZoom(transform, [start, end])` is called on
+ * every user zoom/pan, and a previously saved transform can be restored by
+ * passing it back as `options.zoomTransform`.
+ *
  * @param {Element} containerEl the element to render into
  * @param {Array} data the timeline data array
  * @param {Object} options normalized options, see granite-timeline.js _buildOptions()
@@ -197,12 +208,13 @@ export function renderTimeline(containerEl, data, options = {}) {
 
   const rowY = (rowIndex) => margin.top + (itemHeight + itemMargin) * rowIndex;
 
-  const xScale = scaleTime()
+  const baseScale = scaleTime()
     .domain(domain)
     .range([margin.left, width - margin.right]);
 
   const colorScale = options.colors || scaleOrdinal(schemeCategory10);
   const labelText = (label) => (options.labelFormat ? options.labelFormat(label) : String(label));
+  const barEnd = (time) => (time.ending_time !== undefined ? time.ending_time : time.starting_time);
 
   const svg = select(containerEl)
     .append('svg')
@@ -239,26 +251,36 @@ export function renderTimeline(containerEl, data, options = {}) {
       .attr('stroke-width', 1);
   }
 
-  // Bars
-  const bars = svg.selectAll('rect.timeline-bar')
+  // With zoom enabled, bars / bar labels / today line pan out of the plot
+  // area: clip them so they don't bleed under the row labels and margins.
+  let plotLayer = svg;
+  if (options.axisZoom) {
+    const clipId = `granite-timeline-clip-${++clipIdCounter}`;
+    svg.append('defs')
+      .append('clipPath')
+      .attr('id', clipId)
+      .append('rect')
+      .attr('x', margin.left)
+      .attr('y', 0)
+      .attr('width', Math.max(0, width - margin.left - margin.right))
+      .attr('height', height);
+    plotLayer = svg.append('g').attr('clip-path', `url(#${clipId})`);
+  }
+
+  // Bars (x-dependent attributes are set in applyScale)
+  const bars = plotLayer.selectAll('rect.timeline-bar')
     .data(flat)
     .join('rect')
     .attr('class', (d) => `timeline-bar${d.series.class ? ` ${d.series.class}` : ''}`)
-    .attr('x', (d) => xScale(d.time.starting_time))
     .attr('y', (d) => rowY(d.rowIndex))
-    .attr('width', (d) => {
-      const end = d.time.ending_time !== undefined ? d.time.ending_time : d.time.starting_time;
-      return Math.max(0, xScale(end) - xScale(d.time.starting_time));
-    })
     .attr('height', itemHeight)
     .attr('fill', (d) => resolveColor(d, colorScale, options.colorsProperty));
 
   // Per-bar labels
-  svg.selectAll('text.timeline-bar-label')
+  const barLabels = plotLayer.selectAll('text.timeline-bar-label')
     .data(flat.filter((d) => d.time.label !== undefined))
     .join('text')
     .attr('class', 'timeline-bar-label')
-    .attr('x', (d) => xScale(d.time.starting_time) + 5)
     .attr('y', (d) => rowY(d.rowIndex) + itemHeight * 0.75)
     .text((d) => labelText(d.time.label));
 
@@ -275,35 +297,75 @@ export function renderTimeline(containerEl, data, options = {}) {
   }
 
   // Today line
-  if (options.showToday) {
-    const now = Date.now();
-    if (now >= domain[0].getTime() && now <= domain[1].getTime()) {
-      const todayFormat = { ...TIMELINE_DEFAULTS.todayFormat, ...options.todayFormat };
-      svg.append('line')
-        .attr('class', 'timeline-today')
-        .attr('x1', xScale(now))
-        .attr('x2', xScale(now))
-        .attr('y1', todayFormat.marginTop)
-        .attr('y2', height - todayFormat.marginBottom)
-        .attr('stroke', todayFormat.color)
-        .attr('stroke-width', todayFormat.width);
-    }
+  let todayLine = null;
+  const now = Date.now();
+  if (options.showToday && now >= domain[0].getTime() && now <= domain[1].getTime()) {
+    const todayFormat = { ...TIMELINE_DEFAULTS.todayFormat, ...options.todayFormat };
+    todayLine = plotLayer.append('line')
+      .attr('class', 'timeline-today')
+      .attr('y1', todayFormat.marginTop)
+      .attr('y2', height - todayFormat.marginBottom)
+      .attr('stroke', todayFormat.color)
+      .attr('stroke-width', todayFormat.width);
   }
 
   // Time axis
+  let axisG = null;
   if (options.showTimeAxis) {
-    const axisG = svg.append('g')
+    axisG = svg.append('g')
       .attr('class', 'axis timeline-axis')
-      .attr('transform', `translate(0, ${options.axisTop ? margin.top : height - margin.bottom})`)
-      .call(buildAxis(xScale, options));
+      .attr('transform', `translate(0, ${options.axisTop ? margin.top : height - margin.bottom})`);
+  }
 
-    if (options.rotateTicks) {
-      const rotate = options.rotateTicks;
-      axisG.selectAll('text')
-        .attr('transform', `rotate(${rotate})`)
-        .attr('dx', rotate < 0 ? '-0.8em' : '0.8em')
-        .attr('dy', rotate < 0 ? '0.15em' : '0.55em')
-        .style('text-anchor', rotate < 0 ? 'end' : 'start');
+  /** (Re)applies a time scale to every x-dependent part of the chart. */
+  const applyScale = (scale) => {
+    bars
+      .attr('x', (d) => scale(d.time.starting_time))
+      .attr('width', (d) => Math.max(0, scale(barEnd(d.time)) - scale(d.time.starting_time)));
+    barLabels.attr('x', (d) => scale(d.time.starting_time) + 5);
+    if (todayLine) {
+      todayLine.attr('x1', scale(now)).attr('x2', scale(now));
+    }
+    if (axisG) {
+      axisG.call(buildAxis(scale, options));
+      if (options.rotateTicks) {
+        const rotate = options.rotateTicks;
+        axisG.selectAll('text')
+          .attr('transform', `rotate(${rotate})`)
+          .attr('dx', rotate < 0 ? '-0.8em' : '0.8em')
+          .attr('dy', rotate < 0 ? '0.15em' : '0.55em')
+          .style('text-anchor', rotate < 0 ? 'end' : 'start');
+      }
+    }
+  };
+  applyScale(baseScale);
+
+  // Axis zoom & pan
+  if (options.axisZoom) {
+    const plotExtent = [[margin.left, 0], [width - margin.right, height]];
+    const zoomBehavior = d3zoom()
+      .scaleExtent([1, options.maxZoomScale ?? TIMELINE_DEFAULTS.maxZoomScale])
+      .extent(plotExtent)
+      .translateExtent(plotExtent)
+      // Plain wheel keeps scrolling the page: zooming needs Ctrl/⌘ (trackpad
+      // pinch gestures report ctrlKey and work out of the box).
+      .filter((event) => {
+        if (event.type === 'wheel') {
+          return event.ctrlKey || event.metaKey;
+        }
+        return !event.button;
+      })
+      .on('zoom', (event) => {
+        const scale = event.transform.rescaleX(baseScale);
+        applyScale(scale);
+        // Only report user interactions, not programmatic transform restores
+        if (options.onZoom && event.sourceEvent) {
+          options.onZoom(event.transform, scale.domain());
+        }
+      });
+    svg.call(zoomBehavior).style('cursor', 'grab');
+    if (options.zoomTransform) {
+      svg.call(zoomBehavior.transform, options.zoomTransform);
     }
   }
 
@@ -325,5 +387,5 @@ export function renderTimeline(containerEl, data, options = {}) {
       .on('mousemove', emit('hover'));
   }
 
-  return { svgNode, scale: xScale };
+  return { svgNode, scale: baseScale };
 }

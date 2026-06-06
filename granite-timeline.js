@@ -43,6 +43,7 @@ const toDate = (value) => {
  * @fires mouseover - Fired on mouseover of a timeline bar. detail: {d, index, datum, mouse, evt}
  * @fires mouseout - Fired on mouseout of a timeline bar. detail: {d, index, datum, mouse, evt}
  * @fires hover - Fired on mouse move over a timeline bar. detail: {d, index, datum, mouse, evt}
+ * @fires zoom - Fired when the visible domain changes by zooming/panning. detail: {start, end, transform}
  *
  * @cssprop --granite-timeline-label-color - Color of the series and bar labels
  * @cssprop --granite-timeline-axis-color - Color of the time axis line and ticks
@@ -94,6 +95,11 @@ export class GraniteTimeline extends LitElement {
     rotateTicks: { type: Number, attribute: 'rotate-ticks' },
     /** If set, the time axis is placed on top instead of the bottom. */
     axisTop: { type: Boolean, attribute: 'axis-top' },
+    /**
+     * If set, the time axis can be zoomed with Ctrl/⌘ + mouse wheel (or
+     * trackpad pinch), panned by dragging, and zoomed in by double-clicking.
+     */
+    axisZoom: { type: Boolean, attribute: 'axis-zoom' },
     /**
      * A d3 ordinal color scale for the data series.
      * Default: `scaleOrdinal(schemeCategory10)`. Property only.
@@ -158,6 +164,7 @@ export class GraniteTimeline extends LitElement {
     super();
     this.data = [];
     this.axisTop = false;
+    this.axisZoom = false;
     this.stack = false;
     this.showToday = false;
     this.showTimeAxis = false;
@@ -187,6 +194,12 @@ export class GraniteTimeline extends LitElement {
   disconnectedCallback() {
     this._resizeObserver?.disconnect();
     super.disconnectedCallback();
+  }
+
+  /** Resets the axis zoom/pan to the initial full-domain view. */
+  resetZoom() {
+    this._zoomTransform = undefined;
+    this._requestDraw();
   }
 
   /** Coalesces draw requests (property updates + resizes) into one redraw. */
@@ -222,6 +235,16 @@ export class GraniteTimeline extends LitElement {
       tickValues: this.tickValues,
       rotateTicks: this.rotateTicks,
       axisTop: this.axisTop,
+      axisZoom: this.axisZoom,
+      zoomTransform: this._zoomTransform,
+      onZoom: (transform, [start, end]) => {
+        this._zoomTransform = transform;
+        this.dispatchEvent(new CustomEvent('zoom', {
+          detail: { start, end, transform },
+          bubbles: true,
+          composed: true,
+        }));
+      },
       colors: this.colors,
       colorsProperty: this.colorsProperty,
       beginning: toDate(this.beginning),

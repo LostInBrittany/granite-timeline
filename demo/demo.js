@@ -76,6 +76,31 @@ todayEl.data = [
 todayEl.beginning = now - 12 * HOUR;
 todayEl.ending = now + 12 * HOUR;
 
+// --- Axis zoom & pan demo ------------------------------------------------------
+
+const DAY = 24 * HOUR;
+const zoomEl = document.querySelector('#zoom');
+const zoomStart = now - 5 * DAY;
+const makeTimes = (offset, count, duration) => Array.from({ length: count }, (_, i) => ({
+  starting_time: zoomStart + offset + i * ((6 * DAY) / count),
+  ending_time: zoomStart + offset + i * ((6 * DAY) / count) + duration,
+}));
+zoomEl.data = [
+  { label: 'Deploys', times: makeTimes(0, 48, 15 * 60000) },
+  { label: 'Incidents', times: makeTimes(2 * HOUR, 10, 2 * HOUR) },
+  { label: 'Backups', times: makeTimes(HOUR, 24, 45 * 60000) },
+];
+const zoomLog = document.querySelector('#zoom-log');
+zoomEl.addEventListener('zoom', (e) => {
+  const { start, end, transform } = e.detail;
+  zoomLog.textContent = `visible: ${start.toLocaleString()} → ${end.toLocaleString()} `
+    + `(zoom ×${transform.k.toFixed(2)})`;
+});
+document.querySelector('#reset-zoom').addEventListener('click', () => {
+  zoomEl.resetZoom();
+  zoomLog.textContent = '(zoom reset)';
+});
+
 // --- Events demo --------------------------------------------------------------
 
 const eventsEl = document.querySelector('#events');
