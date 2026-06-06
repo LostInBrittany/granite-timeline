@@ -29,7 +29,8 @@
     "granite-timeline.js",
     "src/",
     "LICENSE.md",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "dev": "vite",
