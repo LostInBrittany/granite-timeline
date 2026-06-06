@@ -2,49 +2,116 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>granite-timeline demo</title>
-
-    <script src="../../../@webcomponents/webcomponentsjs/webcomponents-loader.js"></script>
-
-    <script type="module" src="../../../@polymer/iron-demo-helpers/demo-pages-shared-styles.js"></script>
-    <script type="module" src="../../../@polymer/iron-demo-helpers/demo-snippet.js"></script>
-    <script type="module" src="../granite-timeline.js"></script>
-
-    <!-- FIXME(polymer-modulizer):
-        These imperative modules that innerHTML your HTML are
-        a hacky way to be sure that any mixins in included style
-        modules are ready before any elements that reference them are
-        instantiated, otherwise the CSS @apply mixin polyfill won't be
-        able to expand the underlying CSS custom properties.
-        See: https://github.com/Polymer/polymer-modulizer/issues/154
-        -->
-    <script type="module">
-const $_documentContainer = document.createElement('template');
-
-$_documentContainer.innerHTML = `<custom-style>
-      <style is="custom-style" include="demo-pages-shared-styles">
-      </style>
-    </custom-style>`;
-
-document.body.appendChild($_documentContainer.content);
-</script>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 1rem 2rem 4rem;
+        color: #222;
+      }
+      h1 {
+        font-weight: 600;
+      }
+      section {
+        margin: 3rem 0;
+      }
+      pre {
+        background: #f5f5f5;
+        border-radius: 6px;
+        padding: 1rem;
+        overflow-x: auto;
+        font-size: 0.85rem;
+      }
+      output {
+        display: block;
+        background: #f5f5f5;
+        border-radius: 6px;
+        padding: 1rem;
+        min-height: 3rem;
+        font-family: monospace;
+        font-size: 0.85rem;
+        white-space: pre-wrap;
+      }
+    </style>
+    <script type="module" src="./demo.js"></script>
   </head>
   <body>
-    <script type="module">
-const $_documentContainer = document.createElement('template');
+    <h1>&lt;granite-timeline&gt; demo</h1>
 
-$_documentContainer.innerHTML = `<div class="vertical-section-container centered">
-      <h3>Basic granite-timeline demo</h3>
-      <demo-snippet>
-        <template>
-          <granite-timeline data="[{&quot;times&quot;:[{&quot;starting_time&quot;:1355752800000,&quot;ending_time&quot;:1355759900000}, {&quot;starting_time&quot;:1355767900000,&quot;ending_time&quot;:1355774400000}]},{&quot;times&quot;:[{&quot;starting_time&quot;:1355759910000,&quot;ending_time&quot;:1355761900000}]},{&quot;times&quot;:[{&quot;starting_time&quot;:1355761910000,&quot;ending_time&quot;:1355763910000}]}]" debug=""></granite-timeline>
-        </template>
-      </demo-snippet>
-    </div>`;
+    <section>
+      <h3>Basic timeline</h3>
+      <granite-timeline id="basic"
+          data='[{"times":[{"starting_time":1355752800000,"ending_time":1355759900000},{"starting_time":1355767900000,"ending_time":1355774400000}]},{"times":[{"starting_time":1355759910000,"ending_time":1355761900000}]},{"times":[{"starting_time":1355761910000,"ending_time":1355763910000}]}]'
+          show-time-axis></granite-timeline>
+      <pre>&lt;granite-timeline
+    data='[{"times":[{"starting_time":1355752800000,"ending_time":1355759900000}, …]}, …]'
+    show-time-axis&gt;&lt;/granite-timeline&gt;</pre>
+    </section>
 
-document.body.appendChild($_documentContainer.content);
-</script>
+    <section>
+      <h3>Stacked, with labels, row separators and background</h3>
+      <granite-timeline id="stacked"
+          stack show-time-axis
+          margin-left="100"
+          row-separators="lightgray"
+          background="#f7f7f7"></granite-timeline>
+      <pre>&lt;granite-timeline stack show-time-axis margin-left="100"
+    row-separators="lightgray" background="#f7f7f7"&gt;&lt;/granite-timeline&gt;
+// data with series labels and per-bar labels set as a property, see demo.js</pre>
+    </section>
+
+    <section>
+      <h3>Custom color scale with <code>colors-property</code></h3>
+      <granite-timeline id="fruits"
+          stack show-time-axis
+          margin-left="100"
+          colors-property="fruit"></granite-timeline>
+      <pre>el.colors = scaleOrdinal()
+    .domain(['apple', 'orange', 'lemon'])
+    .range(['#6b0000', '#ef9b0f', '#ffee00']);
+// per-time `fruit` overrides the series one; per-time `color` overrides everything</pre>
+    </section>
+
+    <section>
+      <h3>Today line and tick configuration</h3>
+      <granite-timeline id="today"
+          stack show-time-axis show-today
+          margin-left="100"
+          today-color="red" today-width="2"
+          tick-interval="3" tick-format="%H:%M" rotate-ticks="-30"
+          margin-bottom="40"></granite-timeline>
+      <pre>el.tickTime = timeHour;   // from 'd3-time'
+&lt;granite-timeline show-today today-color="red" today-width="2"
+    tick-interval="3" tick-format="%H:%M" rotate-ticks="-30"&gt;&lt;/granite-timeline&gt;</pre>
+    </section>
+
+    <section>
+      <h3>Axis zoom &amp; pan</h3>
+      <granite-timeline id="zoom"
+          stack show-time-axis axis-zoom
+          margin-left="100"
+          tick-format="%d %b %H:%M"></granite-timeline>
+      <p>
+        <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + mouse wheel (or trackpad pinch) to zoom,
+        drag to pan, double-click to zoom in.
+        <button id="reset-zoom">Reset zoom</button>
+      </p>
+      <output id="zoom-log">(zoom events will appear here)</output>
+      <pre>&lt;granite-timeline stack show-time-axis axis-zoom&gt;&lt;/granite-timeline&gt;
+el.addEventListener('zoom', (e) =&gt; { /* e.detail = {start, end, transform} */ });
+el.resetZoom();   // back to the full-domain view</pre>
+    </section>
+
+    <section>
+      <h3>Events</h3>
+      <granite-timeline id="events"
+          stack show-time-axis
+          margin-left="100"></granite-timeline>
+      <p>Click or hover the bars:</p>
+      <output id="event-log">(no events yet)</output>
+    </section>
   </body>
 </html>

@@ -1,739 +1,285 @@
-import { PolymerElement } from '@polymer/polymer/polymer-element.js';
-import '@granite-elements/granite-js-dependencies-grabber/granite-js-dependencies-grabber.js';
-import { html } from '@polymer/polymer/lib/utils/html-tag.js';
+import { LitElement, html, css } from 'lit';
+import { renderTimeline } from './src/timeline-renderer.js';
 
-/* globals d3 */
+/**
+ * Converter for the `beginning`/`ending` attributes: accepts a ms-epoch
+ * number, an ISO date string, or (as a property) a Date.
+ */
+const dateConverter = {
+  fromAttribute(value) {
+    if (value === null || value === '') {
+      return undefined;
+    }
+    const asNumber = Number(value);
+    return new Date(Number.isNaN(asNumber) ? value : asNumber);
+  },
+  toAttribute(value) {
+    return value instanceof Date ? value.toISOString() : value;
+  },
+};
+
+/** Normalizes a Date | ms-number | string property value to a Date. */
+const toDate = (value) => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  return value instanceof Date ? value : new Date(value);
+};
+
 /**
  * `granite-timeline`
- * A timeline rendering element using d3 and d3-timelines plugin
  *
- * @customElement
- * @polymer
+ * A timeline rendering web component using Lit and d3.
+ *
+ * ```html
+ * <granite-timeline
+ *     data='[{"times":[{"starting_time":1355752800000,"ending_time":1355759900000}]}]'
+ *     show-time-axis></granite-timeline>
+ * ```
+ *
+ * @element granite-timeline
+ *
+ * @fires click - Fired on click on a timeline bar. detail: {d, index, datum, mouse, evt}
+ * @fires mouseover - Fired on mouseover of a timeline bar. detail: {d, index, datum, mouse, evt}
+ * @fires mouseout - Fired on mouseout of a timeline bar. detail: {d, index, datum, mouse, evt}
+ * @fires hover - Fired on mouse move over a timeline bar. detail: {d, index, datum, mouse, evt}
+ * @fires zoom - Fired when the visible domain changes by zooming/panning. detail: {start, end, transform}
+ *
+ * @cssprop --granite-timeline-label-color - Color of the series and bar labels
+ * @cssprop --granite-timeline-axis-color - Color of the time axis line and ticks
+ *
  * @demo demo/index.html
  */
-class GraniteTimeline extends PolymerElement {
-  static get template() {
-    return html`
-    <style>
-      :host {
-        display: block;
-        width: 100%;
-        height: 100%;
-      }
-      #timeline {
-        width: 100%;
-        height: 100%;
-      }
-    </style>
+export class GraniteTimeline extends LitElement {
+  static properties = {
+    /**
+     * The timeline data:
+     * `[{label?, times: [{starting_time, ending_time, label?, color?}]}]`
+     */
+    data: { type: Array },
+    /** Width of the timeline in pixels. Defaults to the element width. */
+    width: { type: Number },
+    /** Height of the timeline in pixels. Computed from the rows if unset. */
+    height: { type: Number },
+    /** Height of a data series row in pixels. Default: 20 */
+    itemHeight: { type: Number, attribute: 'item-height' },
+    /** Margin between data series rows in pixels. Default: 5 */
+    itemMargin: { type: Number, attribute: 'item-margin' },
+    /** Top margin in pixels. Default: 30 */
+    marginTop: { type: Number, attribute: 'margin-top' },
+    /** Bottom margin in pixels. Default: 30 */
+    marginBottom: { type: Number, attribute: 'margin-bottom' },
+    /** Left margin in pixels. Default: 30 */
+    marginLeft: { type: Number, attribute: 'margin-left' },
+    /** Right margin in pixels. Default: 30 */
+    marginRight: { type: Number, attribute: 'margin-right' },
+    /**
+     * Tick label format: a d3 time-format specifier string (e.g. `%H:%M`)
+     * or, as a property, a `(date) => string` function. Default: `%I %p`
+     */
+    tickFormat: { attribute: 'tick-format' },
+    /**
+     * Time unit of the ticks: a d3-time interval, e.g.
+     * `import { timeHour } from 'd3-time'`. Property only.
+     */
+    tickTime: { attribute: false },
+    /** Tick interval, used together with `tickTime`. Default: 1 */
+    tickInterval: { type: Number, attribute: 'tick-interval' },
+    /** Number of ticks, used when `tickTime` is not set. */
+    numTicks: { type: Number, attribute: 'num-ticks' },
+    /** Tick size in pixels. Default: 6 */
+    tickSize: { type: Number, attribute: 'tick-size' },
+    /** Explicit tick values (array of Date or ms-epoch). Property only. */
+    tickValues: { attribute: false },
+    /** Degrees of rotation of the tick labels. Default: 0 */
+    rotateTicks: { type: Number, attribute: 'rotate-ticks' },
+    /** If set, the time axis is placed on top instead of the bottom. */
+    axisTop: { type: Boolean, attribute: 'axis-top' },
+    /**
+     * If set, the time axis can be zoomed with Ctrl/⌘ + mouse wheel (or
+     * trackpad pinch), panned by dragging, and zoomed in by double-clicking.
+     */
+    axisZoom: { type: Boolean, attribute: 'axis-zoom' },
+    /**
+     * A d3 ordinal color scale for the data series.
+     * Default: `scaleOrdinal(schemeCategory10)`. Property only.
+     */
+    colors: { attribute: false },
+    /**
+     * Data item property name that maps data items to the `colors` scale.
+     * Looked up on the time entry first, then on the series.
+     */
+    colorsProperty: { type: String, attribute: 'colors-property' },
+    /** Start of the timeline. Computed from the data if unset. */
+    beginning: { converter: dateConverter },
+    /** End of the timeline. Computed from the data if unset. */
+    ending: { converter: dateConverter },
+    /** If set, each data series is stacked on its own row. */
+    stack: { type: Boolean },
+    /** If set, a vertical line shows the current time. */
+    showToday: { type: Boolean, attribute: 'show-today' },
+    /** Top margin of the today line. Default: 25 */
+    todayMarginTop: { type: Number, attribute: 'today-margin-top' },
+    /** Bottom margin of the today line. Default: 0 */
+    todayMarginBottom: { type: Number, attribute: 'today-margin-bottom' },
+    /** Stroke width of the today line. Default: 2 */
+    todayWidth: { type: Number, attribute: 'today-width' },
+    /** Color of the today line. Default: rgb(245, 157, 0) */
+    todayColor: { type: String, attribute: 'today-color' },
+    /** If set, the time axis is shown. */
+    showTimeAxis: { type: Boolean, attribute: 'show-time-axis' },
+    /** Background color of the rows. */
+    background: { type: String },
+    /** Color of the horizontal separator lines between rows. */
+    rowSeparators: { type: String, attribute: 'row-separators' },
+    /**
+     * Callback generating the text of series and bar labels from the raw
+     * `label` value, e.g. `(label) => label[currentLocale]`. Property only.
+     */
+    labelFormat: { attribute: false },
+    /** If set, debug information is logged to the console. */
+    debug: { type: Boolean },
+  };
 
-    <granite-js-dependencies-grabber 
-        dependencies="[[_dependencies]]" 
-        on-dependency-is-ready="_onDependencyIsReady" 
-        debug="[[debug]]"></granite-js-dependencies-grabber>
-    <div id="timeline"></div>
+  static styles = css`
+    :host {
+      display: block;
+      width: 100%;
+    }
+    #timeline {
+      width: 100%;
+    }
+    .timeline-label,
+    .timeline-bar-label {
+      font: 12px sans-serif;
+      fill: var(--granite-timeline-label-color, currentColor);
+    }
+    .timeline-axis {
+      color: var(--granite-timeline-axis-color, currentColor);
+      font: 10px sans-serif;
+    }
+  `;
 
-`;
+  constructor() {
+    super();
+    this.data = [];
+    this.axisTop = false;
+    this.axisZoom = false;
+    this.stack = false;
+    this.showToday = false;
+    this.showTimeAxis = false;
+    this.debug = false;
   }
 
-  /** 
-   * In order to statically import non ES mudules resources, you need to use `importPath`.
-   * But in order to use `importPath`, for elements defined in ES modules, users should implement
-   * `static get importMeta() { return import.meta; }`, and the default
-   * implementation of `importPath` will  return `import.meta.url`'s path.
-   * More info on @Polymer/lib/mixins/element-mixin.js`
-   */
-  static get importMeta() { return import.meta; } 
+  render() {
+    return html`<div id="timeline" part="timeline"></div>`;
+  }
 
-  static get is() { return 'granite-timeline'; }
+  connectedCallback() {
+    super.connectedCallback();
+    // Re-observe on reconnection; initial observation happens in firstUpdated()
+    this._resizeObserver?.observe(this);
+  }
 
-  /**
-   * Fired on mouseover of the timeline data.
-   *
-   * @event mouseover
-   * @param object d The current rendering object
-   * @param number i The index during d3 rendering
-   * @param object datum The data object
-   */
+  firstUpdated() {
+    this._container = this.renderRoot.querySelector('#timeline');
+    this._resizeObserver = new ResizeObserver(() => this._requestDraw());
+    this._resizeObserver.observe(this);
+  }
 
-  /**
-   * Fired on mouseout of the timeline data.
-   *
-   * @event mouseout
-   * @param object d The current rendering object
-   * @param number i The index during d3 rendering
-   * @param object datum The data object
-   */
+  updated() {
+    this._requestDraw();
+  }
 
-  /**
-   * Fired on click of the timeline data.
-   *
-   * @event click
-   * @param object d The current rendering object
-   * @param number i The index during d3 rendering
-   * @param object datum The data object
-   */
+  disconnectedCallback() {
+    this._resizeObserver?.disconnect();
+    super.disconnectedCallback();
+  }
 
-  /**
-   * Fired on hover of the timeline data.
-   *
-   * @event hover
-   * @param object d The current rendering object
-   * @param number i The index during d3 rendering
-   * @param object datum The data object
-   */
+  /** Resets the axis zoom/pan to the initial full-domain view. */
+  resetZoom() {
+    this._zoomTransform = undefined;
+    this._requestDraw();
+  }
 
+  /** Coalesces draw requests (property updates + resizes) into one redraw. */
+  _requestDraw() {
+    if (this._drawQueued) {
+      return;
+    }
+    this._drawQueued = true;
+    queueMicrotask(() => {
+      this._drawQueued = false;
+      this._draw();
+    });
+  }
 
-  /**
-   * Fired on scroll of the timeline data.
-   *
-   * @event scroll
-   * @param object d The current rendering object
-   * @param number i The index during d3 rendering
-   * @param object datum The data object
-   */
-
-  static get properties() {
+  /** Builds the normalized options object for the renderer. */
+  _buildOptions(width) {
     return {
-      data: {
-        type: Array,
-        value: () => [],
-        observer: '_onDataChanged',
+      width,
+      height: this.height,
+      itemHeight: this.itemHeight,
+      itemMargin: this.itemMargin,
+      margin: {
+        ...(this.marginTop !== undefined && { top: this.marginTop }),
+        ...(this.marginBottom !== undefined && { bottom: this.marginBottom }),
+        ...(this.marginLeft !== undefined && { left: this.marginLeft }),
+        ...(this.marginRight !== undefined && { right: this.marginRight }),
       },
-      chart: {
-        type: Object,
-        value: () => {},
+      tickFormat: this.tickFormat,
+      tickTime: this.tickTime,
+      tickInterval: this.tickInterval,
+      numTicks: this.numTicks,
+      tickSize: this.tickSize,
+      tickValues: this.tickValues,
+      rotateTicks: this.rotateTicks,
+      axisTop: this.axisTop,
+      axisZoom: this.axisZoom,
+      zoomTransform: this._zoomTransform,
+      onZoom: (transform, [start, end]) => {
+        this._zoomTransform = transform;
+        this.dispatchEvent(new CustomEvent('zoom', {
+          detail: { start, end, transform },
+          bubbles: true,
+          composed: true,
+        }));
       },
-
-      /**
-       * Sets the width of the timeline. If the width of the timeline is longer than
-       * the width of the svg object, the timeline will automatically scroll. The width
-       * of the timeline will default to the width of the svg if width is not set.
-       */
-      width: {
-        type: Number,
+      colors: this.colors,
+      colorsProperty: this.colorsProperty,
+      beginning: toDate(this.beginning),
+      ending: toDate(this.ending),
+      stack: this.stack,
+      showToday: this.showToday,
+      todayFormat: {
+        ...(this.todayMarginTop !== undefined && { marginTop: this.todayMarginTop }),
+        ...(this.todayMarginBottom !== undefined && { marginBottom: this.todayMarginBottom }),
+        ...(this.todayWidth !== undefined && { width: this.todayWidth }),
+        ...(this.todayColor !== undefined && { color: this.todayColor }),
       },
-      /**
-       * Sets the height of the timeline. The height of the timeline will be automatically
-       * calculated from the height of each item if height is not set on the
-       * timeline or the svg.
-       */
-      height: {
-        type: Number,
+      showTimeAxis: this.showTimeAxis,
+      background: this.background,
+      rowSeparators: this.rowSeparators,
+      labelFormat: this.labelFormat,
+      onBarEvent: (type, detail) => {
+        this.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
       },
-      /**
-       * Sets the height of the data series in the timeline in pixels. Default: 20
-       */
-      itemHeight: {
-        type: Number,
-      },
-      /**
-       * Sets the margin between the data series in the timeline in pixels. Default: 5
-       */
-      itemMargin: {
-        type: Number,
-      },
-      /**
-       * Sets the top margin in pixel. Default: 30
-       */
-      marginTop: {
-        type: Number,
-      },
-      /**
-       * Sets the bottom margin in pixel. Default: 30
-       */
-      marginBottom: {
-        type: Number,
-      },
-      /**
-       * Sets the left margin in pixel. Default: 30
-       */
-      marginLeft: {
-        type: Number,
-      },
-      /**
-       * Sets the right margin in pixel. Default: 30
-       */
-      marginRight: {
-        type: Number,
-      },
-
-      /**
-       * By default the data is displayed as rectangles (`.display('rect')`).
-       * If set, data series are displayed as circles (`.display('circle')`).
-       */
-      displayCircles: {
-        type: Boolean,
-        value: false,
-      },
-
-      /**
-       * registers a function to be called when the text for the label needs to be
-       * generated. Useful if your label looks like this:
-       * ```
-       * {
-       *   en: "my label",
-       *   fr: "mon étiquette"
-       * }
-       * The callback function is passed the whatever the datum.label returns, so in this
-       * case it would be the object above. So the `labelFormat` might look something like
-       * this:
-       *
-       * `(label) => label[currentLocale]`
-       */
-      labelFormat: {
-        type: Object,
-      },
-
-      /**
-       * sets the formatting of the ticks in the timeline. Default: d3.time.format("%I %p")
-       */
-      tickFormat: {
-        type: Object,
-      },
-      /**
-       * sets the time unit of the ticks in the timeline.
-       *
-       * Tick interval/values can be set with:
-       *
-       * `tickTime` and `tickInterval`
-       * `numTicks` and `tickInterval`
-       * `tickValues`
-       *
-       * Default: d3.time.hours
-       */
-      tickTime: {
-        type: Object,
-      },
-      /**
-       * sets the tick interval for the ticks in the timeline.
-       *
-       * Tick interval/values can be set with:
-       *
-       * `tickTime` and `tickInterval`
-       * `numTicks` and `tickInterval`
-       * `tickValues`
-       *
-       * Default: 1
-       */
-       tickInterval: {
-         type: Number,
-      },
-      /**
-       * sets the number of ticks in the timeline.
-       *
-       * Tick interval/values can be set with:
-       *
-       * `tickTime` and `tickInterval`
-       * `numTicks` and `tickInterval`
-       * `tickValues`
-       *
-       * Default: not set
-       */
-      numTicks: {
-        type: Object,
-      },
-      /**
-       * sets the tick size for the ticks in the timeline. Default: 6
-       */
-      tickSize: {
-         type: Number,
-      },
-      /**
-       * sets the values of the ticks in the timeline.
-       *
-       * Default: not set
-       */
-       tickValues: {
-        type: Array,
-      },
-
-      /**
-       * sets the degree of rotation of the tickmarks. Defaults to no rotation (0 degrees)
-       */
-      rotateTicks: {
-        type: Number,
-      },
-
-      /**
-       * By default the axis in at the bottom (`.orient('bottom')`).
-       * If set, the axis is placed on top  (`.orient('top')`).
-       */
-      axisTop: {
-        type: Boolean,
-        value: false,
-      },
-
-      /**
-       * Callback setting the d3 color scale the data series in the timeline.
-       * Default: `d3.scale.category20()`
-       */
-      colors: {
-        type: Object,
-      },
-
-      /**
-       * sets the data item property name that maps your data items to your color scale.
-       * For example if you set your chart's `colors` and `colorsProperty` as follows:
-       *
-       * var colorScale = d3.scale.ordinal()
-       *    .range(['#6b0000','#ef9b0f','#ffee00'])
-       *    .domain(['apple','orange','lemon']);
-       *
-       * [...]
-       *
-       * <granite-timeline colors="{{colorScale}}" color-property="fruit">
-       * </granite-timeline>
-       *
-       * And pass this dataset:
-       *
-       * var testData = [
-       *    {label: "fruit 1", fruit: "orange", times: [
-       *      {"starting_time": 1355759910000, "ending_time": 1355761900000}]},
-       *    {label: "fruit 2", fruit: "apple", times: [
-       *      {"starting_time": 1355752800000, "ending_time": 1355759900000},
-       *      {"starting_time": 1355767900000, "ending_time": 1355774400000}]},
-       *    {label: "fruit3", fruit: "lemon", times: [
-       *      {"starting_time": 1355761910000, "ending_time": 1355763910000}]}
-       * ];
-       *
-       * Your chart's bar colors will be determined based on the value of the fruit property
-       *
-       * You can also set the color property for a specific time object:
-       *
-       * var testData = [
-       *  {label: "fruit 2", fruit: "apple", times: [
-       *    {fruit: "orange", "starting_time": 1355752800000, "ending_time": 1355759900000},
-       *    {"starting_time": 1355767900000, "ending_time": 1355774400000},
-       *  {fruit: "lemon", "starting_time": 1355774400000, "ending_time": 1355775500000}]}
-       *  ];
-       *
-       * Properties set in the time object will override the property set for the series
-       */
-      colorsProperty: {
-        type: String,
-      },
-
-      /**
-       * sets the time that the timeline should start. If beginning and ending are not set,
-       * the timeline will calculate it based off of the smallest and largest times.
-       */
-      beginning: {
-        type: Date,
-      },
-      /**
-       * sets the time that the timeline should stop. If beginning and ending are not set,
-       * the timeline will calculate it based off of the smallest and largest times.
-       */
-      ending: {
-        type: Date,
-      },
-
-      /**
-       * Toggles the stacking/unstacking of data series in the timeline.
-       */
-      stack: {
-        type: Boolean,
-        value: false,
-      },
-
-      /**
-       * Toggles the calculation and use of relative timestamps.
-       * The origin of the timeline will be set to 0 and the starting_time of the
-       * first data dictionary in the data array will be subtracted from every
-       * subsequent timestamp.
-       */
-       relativeTime: {
-        type: Boolean,
-        value: false,
-      },
-
-      /**
-       * Toggles a vertical line showing the current `Date.now()` time.
-       */
-       showToday: {
-        type: Boolean,
-        value: false,
-      },
-      /**
-       * Sets the formatting of the showToday line
-       */
-      todayMarginTop: {
-        type: Number,
-      },
-      /**
-       * Sets the formatting of the showToday line
-       */
-      todayMarginBottom: {
-        type: Number,
-      },
-      /**
-       * Sets the formatting of the showToday line
-       */
-      todayWidth: {
-        type: Number,
-      },
-      /**
-       * Sets the formatting of the showToday line
-       */
-      todayColor: {
-        type: String,
-      },
-
-      /**
-       * Toggles a vertical line showing the borders of one specific timeline.
-       */
-       showBorderLine: {
-        type: Boolean,
-        value: false,
-      },
-      /**
-       * Sets the formatting of the showBorderLine line
-       */
-      borderLineMarginTop: {
-        type: Number,
-      },
-      /**
-       * Sets the formatting of the showBorderLine line
-       */
-      borderLineMarginBottom: {
-        type: Number,
-      },
-      /**
-       * Sets the formatting of the showBorderLine line
-       */
-      borderLineWidth: {
-        type: Number,
-      },
-      /**
-       * Sets the formatting of the showBorderLine line
-       */
-       borderLineColor: {
-        type: String,
-      },
-
-      /**
-       * Toggles the visibility of the time axis.
-       */
-       showTimeAxis: {
-        type: Boolean,
-        value: false,
-      },
-      /**
-       * Shows tick marks along the X axis.
-       * Useful for datasets with a lot of stacked elements.
-       */
-       showTimeAxisTick: {
-        type: Boolean,
-        value: false,
-      },
-      /**
-       * Sets the formatting of the showTimeAxisTick lines. Default: 'stroke-dasharray'
-       */
-      timeAxisTickStroke: {
-        type: String,
-      },
-      /**
-       * Sets the formatting of the showTimeAxisTick lines. Default: '4 10'
-       */
-      timeAxisTickSpacing: {
-        type: String,
-      },
-
-      /**
-       * Sets the class for the x axis. Default: 'timeline-xAxis'
-       */
-      xAxisClass: {
-        type: String,
-      },
-
-      /**
-       * If set, zooming is allowed
-       */
-       axisZoom: {
-        type: Boolean,
-        default: false,
-      },
-
-      /**
-       * Sets the background of the rows. Useful for creating a continuous effect
-       * when there are gaps in your data.
-       */
-      background: {
-        type: String,
-      },
-
-      /**
-       * Sets the display of horizontal lines betweens rows.
-       */
-      rowSeparators: {
-        type: String,
-      },
-
-      debug: {
-        type: Boolean,
-        value: false,
-      },
-      _libReady: {
-        type: Boolean,
-        value: false,
-      },
-      /**
-       * The application dependencies
-       */
-       _dependencies: {
-        type: Array,
-        value: [
-          {name: 'd3', url: `${this.importPath}../../d3/dist/d3.min.js`},
-          {name: 'd3.timelines', url: `${this.importPath}../../d3-timelines/dist/d3-timelines.js`},
-        ],
-      },
+      debug: this.debug,
     };
   }
 
-  // -----------------------------------------------------------------------
-  // Livecycle
-  // -----------------------------------------------------------------------
-  connectedCallback() {
-    super.connectedCallback();
-    if (this.debug) {
-      console.log('[granite-timeline] connectedCallback');
-    }
-  }
-
-  // -----------------------------------------------------------------------
-  // Observers
-  // -----------------------------------------------------------------------
-  _onDataChanged() {
-    this.draw();
-  }
-
-  // -----------------------------------------------------------------------
-  // Event listeners
-  // -----------------------------------------------------------------------
-  _onDependencyIsReady(evt) {
-    if (this.debug) {
-      console.log('[granite-timeline] _onDependencyIsReady', evt.detail.name,this.$.timeline);
-    }
-    if (evt.detail.name !== 'd3.timelines') {
+  _draw() {
+    if (!this._container || !this.isConnected) {
       return;
     }
-    this._width = this.$.timeline.clientWidth || 300;
-    this._libReady = true;
-  }
-
-  // -----------------------------------------------------------------------
-  // Other methods
-  // -----------------------------------------------------------------------
-  _setProperties() {
-    if (this.width) {
-      this.chart.width(this.width);
-    }
-    if (this.height) {
-      this.chart.height(this.height);
-    }
-    if (this.itemHeight) {
-      this.chart.itemHeight(this.itemHeight);
-    }
-    if (this.itemMargin) {
-      this.chart.itemMargin(this.itemMargin);
-    }
-
-    let margin = this.chart.margin();
-    if (this.marginTop !== undefined) {
-      margin.top = this.marginTop;
-    }
-    if (this.marginBottom !== undefined) {
-      margin.bottom = this.marginBottom;
-    }
-    if (this.marginLeft !== undefined) {
-      margin.left = this.marginLeft;
-    }
-    if (this.marginRight !== undefined) {
-      margin.right = this.marginRight;
-    }
-    this.chart.margin(margin);
-
-    if (this.displayCircles) {
-      this.chart.display('circle');
-    }
-
-    if (this.labelFormat) {
-      this.chart.labelFormat(this.labelFormat);
-    }
-
-    let tickFormat = this.chart.tickFormat();
-    if (this.tickFormat) {
-      tickFormat.format = this.tickFormat;
-    }
-    if (this.tickTime) {
-      tickFormat.tickTime = this.tickTime;
-    }
-    if (this.tickInterval) {
-      tickFormat.tickInterval = this.tickInterval;
-    }
-    if (this.tickSize) {
-      tickFormat.tickSize = this.tickSize;
-    }
-    if (this.numTicks) {
-      tickFormat.numTicks = this.numTicks;
-    }
-    if (this.tickValues) {
-      tickFormat.tickValues = this.tickValues;
-    }
-    this.chart.tickFormat(tickFormat);
-
-
-    if (this.rotateTicks) {
-      this.chart.rotateTicks(this.rotateTicks);
-    }
-
-    if (this.axisTop) {
-      this.chart.orient('top');
-    }
-
-    if (this.colors) {
-      this.chart.colors(this.colors);
-    }
-
-    if (this.colorsProperty) {
-      this.chart.colorsProperty(this.colorsProperty);
-    }
-
-    if (this.beginning) {
-      this.chart.beginning(this.beginning);
-    }
-    if (this.ending) {
-      this.chart.ending(this.ending);
-    }
-
-    if (this.stack) {
-      this.chart.stack();
-    }
-
-    if (this.relativeTime) {
-      this.chart.relativeTime();
-    }
-
-    if (this.showToday) {
-      this.chart.showToday();
-    }
-
-    let showTodayFormat = this.chart.showTodayFormat();
-    if (this.todayMarginTop) {
-      showTodayFormat.marginTop = this.todayMarginTop;
-    }
-    if (this.todayMarginBottom) {
-      showTodayFormat.marginBottom = this.todayMarginBottom;
-    }
-    if (this.todayWidth) {
-      showTodayFormat.width = this.todayWidth;
-    }
-    if (this.todayColor) {
-      showTodayFormat.color = this.todayColor;
-    }
-    this.chart.showTodayFormat(showTodayFormat);
-
-    if (this.showBorderLine) {
-      this.chart.showBorderLine();
-    }
-
-    let borderFormat = this.chart.showBorderFormat();
-    if (this.borderLineMarginTop) {
-      borderFormat.marginTop = this.borderLineMarginTop;
-    }
-    if (this.borderLineMarginBottom) {
-      borderFormat.borderLineBottom = this.borderLineMarginBottom;
-    }
-    if (this.borderLineWidth) {
-      borderFormat.width = this.borderLineWidth;
-    }
-    if (this.borderLineColor) {
-      borderFormat.color = this.borderLineColor;
-    }
-    this.chart.showBorderFormat(borderFormat);
-
-    if (this.showTimeAxis) {
-      this.chart.showTimeAxis();
-    }
-    if (this.showTimeAxisTick) {
-      this.chart.showTimeAxisTick();
-    }
-    let showTimeAxisTickFormat = this.chart.showTimeAxisTickFormat();
-    if (this.timeAxisTickStroke) {
-      showTimeAxisTickFormat.stroke = this.timeAxisTickStroke;
-    }
-    if (this.timeAxisTickSpacing) {
-      showTimeAxisTickFormat.spacing = this.timeAxisTickSpacing;
-    }
-    this.chart.showTimeAxisTickFormat(showTimeAxisTickFormat);
-
-    if (this.xAxisClass) {
-      this.chart.xAxisClass(this.xAxisClass);
-    }
-    if (this.axisZoom) {
-      this.chart.axisZoom();
-    }
-
-    if (this.background) {
-      this.chart.background(this.background);
-    }
-    if (this.rowSeparators) {
-      this.chart.rowSeparators(this.rowSeparators);
-    }
-  }
-
-  _setListeners() {
-    this.chart
-      .mouseover((d, index, datum, i) => {
-        let evt = d3.event;
-        let mouse = d3.mouse(this);
-        this.dispatchEvent(new CustomEvent('mouseover', {detail: {d, index, datum, i, evt, mouse}}));
-      })
-      .mouseout((d, index, datum, i) => {
-        let evt = d3.event;
-        let mouse = d3.mouse(this);
-        this.dispatchEvent(new CustomEvent('mouseout', {detail: {d, index, datum, i, evt, mouse}}));
-      })
-      .hover((d, index, datum, i) => {
-        let evt = d3.event;
-        let mouse = d3.mouse(this);
-        this.dispatchEvent(new CustomEvent('hover', {detail: {d, index, datum, i, evt, mouse}}));
-      })
-      .click((d, index, datum, i) => {
-        let evt = d3.event;
-        let mouse = d3.mouse(this);
-        this.dispatchEvent(new CustomEvent('click', {detail: {d, index, datum, i, evt, mouse}}));
-      })
-      .scroll((d, index, datum, i) => {
-        let evt = d3.event;
-        let mouse = d3.mouse(this);
-        this.dispatchEvent(new CustomEvent('scroll', {detail: {d, index, datum, i, evt, mouse}}));
-      });
-  }
-
-  draw() {
-    if (!this._libReady) {
-      if (!this._interval) {
-        this._interval = setInterval(() => this.draw(), 5);
-      }
-      return;
-    }
-    if (this._interval) {
-      clearInterval(this._interval);
-      this._interval = null;
-    }
+    const width = this.width || this._container.clientWidth || 300;
     if (this.debug) {
       console.log('[granite-timeline] draw - Drawing', this.data);
     }
-
-    this.chart = d3.timelines();
-    this._setProperties();
-    this._setListeners();
-
-    d3.select(this.$.timeline)
-      .append('svg').attr('width', this._width)
-      .datum(this.data).call(this.chart);
+    renderTimeline(this._container, this.data || [], this._buildOptions(width));
   }
 }
 
-window.customElements.define(GraniteTimeline.is, GraniteTimeline);
+if (!customElements.get('granite-timeline')) {
+  customElements.define('granite-timeline', GraniteTimeline);
+}
